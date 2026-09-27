@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000000" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+  <!-- Background crisp rounded squircle -->
+  <rect width="512" height="512" rx="128" fill="#FFFFFF" stroke="#F3F4F6" stroke-width="8"/>
+  
+  <!-- Subtle center badge -->
+  <circle cx="256" cy="205" r="130" fill="#FEF2F2" />
+  
+  <!-- Red Briefcase / Pin Badge Icon -->
+  <g filter="url(#shadow)">
+    <!-- Pin Body in Bold Red -->
+    <path d="M256 85 C204 85 165 125 165 178 C165 240 236 312 256 332 C276 312 347 240 347 178 C347 125 308 85 256 85 Z" fill="#DC2626" />
+    <!-- Center white tool spark -->
+    <circle cx="256" cy="178" r="38" fill="#FFFFFF" />
+    <path d="M256 156 L262 172 L278 178 L262 184 L256 200 L250 184 L234 178 L250 172 Z" fill="#DC2626" />
+    <!-- Base shadow arc -->
+    <ellipse cx="256" cy="342" rx="48" ry="10" fill="#E5E7EB" />
+  </g>
+  
+  <!-- Live Pulse Dot Indicator on Logo -->
+  <circle cx="340" cy="115" r="22" fill="#22C55E" stroke="#FFFFFF" stroke-width="5" />
+  <circle cx="340" cy="115" r="32" fill="#22C55E" opacity="0.4" />
+  
+  <!-- Stylized JOBit Brand Typography: JOB in Bold Red, it in Bold Black -->
+  <g font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-size="94" font-weight="900" letter-spacing="-2">
+    <text x="145" y="440" fill="#DC2626">JOB</text>
+    <text x="325" y="440" fill="#000000">it</text>
+  </g>
+</svg>

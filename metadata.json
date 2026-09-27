@@ -1,0 +1,10 @@
+{
+  "name": "JOBit - Hyperlocal Worker Booking",
+  "description": "Mobile-first hyperlocal on-demand service and blue-collar worker booking app with real-time GPS matching, Swiggy-style live job tracking, and instant call/WhatsApp.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
