@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "JOBit - Hyperlocal Worker Booking",
+  "short_name": "JOBit",
+  "description": "On-demand hyperlocal worker booking app with real-time GPS match and Swiggy-style tracking.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#DC2626",
+  "background_color": "#FFFFFF",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
