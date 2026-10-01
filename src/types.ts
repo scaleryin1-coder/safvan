@@ -1,15 +1,26 @@
-export type UserRole = 'customer' | 'worker';
+export type UserRole = 'customer' | 'worker' | 'admin';
 
 export type ServiceCategory = 
   | 'Electrician'
+  | 'AC Service'
   | 'Plumber'
   | 'Carpenter'
-  | 'Home Cleaner'
-  | 'Painter'
-  | 'Driver'
-  | 'Construction Worker'
-  | 'Appliance Repair'
-  | 'Welder';
+  | 'Painting & Wall Work'
+  | 'Construction'
+  | 'Welding'
+  | 'Aluminium Fabrication'
+  | 'Garden & Outdoor Work'
+  | 'Pest Control Service'
+  | 'Bike Service'
+  | 'Car Mechanic'
+  | 'Moving & Labour Service'
+  | 'Security & Smart Home'
+  | 'Electronics Service'
+  | 'Laundry Service'
+  | 'Home Support Service'
+  | 'Beauty & Personal Care'
+  | 'Mehndi Artist'
+  | 'Water Tank & Waste Service';
 
 export type TimeSlotId = 'morning' | 'midday' | 'afternoon' | 'evening';
 
@@ -25,28 +36,41 @@ export interface LocationCoordinates {
   lat: number;
   lng: number;
   address: string;
+  accuracyMeters?: number;
 }
 
 export interface WorkerProfile {
   id: string;
-  name: string; // e.g. "Ramesh K." (Privacy first: only First name + initial)
-  phone: string;
+  name: string; // Privacy first: First name + initial
+  phone: string; // Unique phone number per worker
   profession: ServiceCategory;
-  skills: string[];
+  subCategory?: string;
+  skills: string[]; // Specific sub-category skills
   hourlyRate: number; // in INR ₹
   dailyRate: number; // in INR ₹
-  experience: number; // in years (e.g. 5)
+  experience: number; // in years
   isOnline: boolean;
-  rating: number; // e.g. 4.8
+  rating: number;
   reviewCount: number;
   jobsCompleted: number;
   location: LocationCoordinates;
-  distanceKm?: number; // relative to customer GPS
+  distanceKm?: number;
   verified: boolean;
-  availableSlots: TimeSlotId[]; // e.g. ['morning', 'midday', 'afternoon']
-  availableDays: string[]; // e.g. ['Today', 'Tomorrow', 'Mon', 'Tue']
+  availableSlots: TimeSlotId[];
+  availableDays: string[];
   bio?: string;
   joinedDate: string;
+}
+
+export interface UserAccount {
+  id: string;
+  phone: string; // E.164 normalized e.g. "+919847011223"
+  displayPhone: string; // e.g. "+91 98470 11223"
+  name: string;
+  role: UserRole;
+  workerProfileId?: string;
+  createdAt: string;
+  lastLoginAt: string;
 }
 
 export type BookingStatus = 
@@ -72,17 +96,19 @@ export interface Booking {
   customerAddress: string;
   customerLocation: LocationCoordinates;
   workerId: string;
-  workerName: string; // e.g. "Rajesh N."
+  workerName: string;
   workerPhone: string;
   workerProfession: ServiceCategory;
+  subCategory?: string;
   taskTitle: string;
   taskDescription: string;
-  selectedDate: string; // e.g. "Today (Sep 27)"
+  selectedDate: string;
   selectedSlot: TimeSlotId;
-  selectedSlotLabel: string; // e.g. "Morning (08:00 AM - 11:00 AM)"
+  selectedSlotLabel: string;
   status: BookingStatus;
   createdAt: string;
   acceptedAt?: string;
+  completedAt?: string;
   otp: string; // 4-digit verification code
   hourlyRate: number;
   estimatedHours: number;
@@ -92,6 +118,11 @@ export interface Booking {
   paymentStatus: 'pending' | 'completed';
   rating?: number;
   review?: string;
+  compliments?: string[];
+  invoiceNumber?: string;
+  baseCharge?: number;
+  safetyFee?: number;
+  serviceFee?: number;
   timeline: BookingTimelineStep[];
 }
 
@@ -111,4 +142,5 @@ export interface CategoryInfo {
   iconName: string;
   avgRate: string;
   workerCount: number;
+  subCategories: string[];
 }

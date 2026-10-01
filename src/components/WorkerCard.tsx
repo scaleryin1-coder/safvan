@@ -58,9 +58,14 @@ export const WorkerCard: React.FC<WorkerCardProps> = ({
             </div>
           </div>
 
-          {/* Profession & Experience */}
-          <div className="flex items-center gap-2 mt-0.5 text-xs">
+          {/* Profession, SubCategory & Experience */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-xs">
             <span className="font-extrabold text-red-600">{worker.profession}</span>
+            {worker.subCategory && (
+              <span className="bg-red-50 text-red-700 text-[10px] font-bold px-1.5 py-0.5 rounded border border-red-200">
+                {worker.subCategory}
+              </span>
+            )}
             <span className="text-stone-300">•</span>
             <span className="text-stone-600 font-semibold">{worker.experience} Yrs Exp</span>
             <span className="text-stone-300">•</span>

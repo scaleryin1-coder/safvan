@@ -1,9 +1,9 @@
 import React from 'react';
-import { Home, CalendarCheck, User, Bell, HardHat } from 'lucide-react';
+import { Home, CalendarCheck, User, Bell, HardHat, Shield } from 'lucide-react';
 import { UserRole } from '../types';
 import { triggerHaptic } from '../utils/feedback';
 
-export type NavTab = 'home' | 'bookings' | 'worker-hub' | 'notifications';
+export type NavTab = 'home' | 'bookings' | 'worker-hub' | 'admin' | 'notifications';
 
 interface BottomNavBarProps {
   activeTab: NavTab;
@@ -69,27 +69,46 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({
           </span>
         </button>
 
-        {/* Tab 3: Worker Hub / Register */}
-        <button
-          onClick={() => handleTabClick('worker-hub')}
-          className={`flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
-            activeTab === 'worker-hub' ? 'text-red-600' : 'text-stone-400 hover:text-stone-700'
-          }`}
-        >
-          <div className="relative">
-            {userRole === 'worker' ? (
-              <HardHat className={`w-5 h-5 ${activeTab === 'worker-hub' ? 'stroke-[2.5px] text-red-600' : 'stroke-2'}`} />
-            ) : (
-              <User className={`w-5 h-5 ${activeTab === 'worker-hub' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
-            )}
-            {activeTab === 'worker-hub' && (
-              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-red-600" />
-            )}
-          </div>
-          <span className={`text-[11px] font-black ${activeTab === 'worker-hub' ? 'text-red-600' : ''}`}>
-            {userRole === 'worker' ? 'Dashboard' : 'Register'}
-          </span>
-        </button>
+        {/* Tab 3: Worker Hub / Admin Hub */}
+        {userRole === 'admin' ? (
+          <button
+            onClick={() => handleTabClick('admin')}
+            className={`flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
+              activeTab === 'admin' ? 'text-red-600' : 'text-stone-400 hover:text-stone-700'
+            }`}
+          >
+            <div className="relative">
+              <Shield className={`w-5 h-5 ${activeTab === 'admin' ? 'stroke-[2.5px] text-red-600' : 'stroke-2'}`} />
+              {activeTab === 'admin' && (
+                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-red-600" />
+              )}
+            </div>
+            <span className={`text-[11px] font-black ${activeTab === 'admin' ? 'text-red-600' : ''}`}>
+              Admin
+            </span>
+          </button>
+        ) : (
+          <button
+            onClick={() => handleTabClick('worker-hub')}
+            className={`flex flex-col items-center justify-center gap-1 transition-all active:scale-95 ${
+              activeTab === 'worker-hub' ? 'text-red-600' : 'text-stone-400 hover:text-stone-700'
+            }`}
+          >
+            <div className="relative">
+              {userRole === 'worker' ? (
+                <HardHat className={`w-5 h-5 ${activeTab === 'worker-hub' ? 'stroke-[2.5px] text-red-600' : 'stroke-2'}`} />
+              ) : (
+                <User className={`w-5 h-5 ${activeTab === 'worker-hub' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+              )}
+              {activeTab === 'worker-hub' && (
+                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-red-600" />
+              )}
+            </div>
+            <span className={`text-[11px] font-black ${activeTab === 'worker-hub' ? 'text-red-600' : ''}`}>
+              {userRole === 'worker' ? 'Dashboard' : 'Register'}
+            </span>
+          </button>
+        )}
 
         {/* Tab 4: Notifications */}
         <button

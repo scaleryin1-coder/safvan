@@ -12,6 +12,7 @@ import {
 import { LocationCoordinates, WorkerProfile, Booking, TimeSlotId } from '../types';
 import { JobitAvatar } from './JobitAvatar';
 import { TIME_SLOT_OPTIONS } from '../data/mockData';
+import { getSubCategories } from '../data/categories';
 import { triggerHaptic, playSound } from '../utils/feedback';
 
 interface BookingSheetModalProps {
@@ -90,10 +91,10 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
 }) => {
   if (!worker) return null;
 
-  const defaultTasks = COMMON_TASKS[worker.profession] || [
-    'General task inspection and repair',
-    'On-site hourly labor assistance'
-  ];
+  const categorySubCats = getSubCategories(worker.profession);
+  const defaultTasks = categorySubCats.length > 0 
+    ? categorySubCats 
+    : (COMMON_TASKS[worker.profession] || ['General Service Assistance']);
 
   const availableSlotsList = Array.isArray(worker.availableSlots) && worker.availableSlots.length > 0
     ? worker.availableSlots
@@ -103,7 +104,11 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
     ? initialSlot
     : availableSlotsList[0] || 'morning';
 
-  const [selectedTask, setSelectedTask] = useState(defaultTasks[0]);
+  const [selectedTask, setSelectedTask] = useState(
+    worker.subCategory && defaultTasks.includes(worker.subCategory) 
+      ? worker.subCategory 
+      : defaultTasks[0]
+  );
   const [customNotes, setCustomNotes] = useState('');
   const [selectedDate, setSelectedDate] = useState(initialDate || 'Today');
   const [selectedSlotId, setSelectedSlotId] = useState<TimeSlotId>(defaultSlotId);
@@ -132,6 +137,7 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
         workerName: worker.name,
         workerPhone: worker.phone,
         workerProfession: worker.profession,
+        subCategory: selectedTask,
         taskTitle: selectedTask,
         taskDescription: customNotes ? `${selectedTask} - ${customNotes}` : selectedTask,
         selectedDate,
@@ -365,23 +371,53 @@ export const BookingSheetModal: React.FC<BookingSheetModalProps> = ({
             </div>
           </div>
 
-          {/* Price Breakdown */}
-          <div className="bg-stone-50 rounded-2xl p-3 border border-stone-200 space-y-1.5 text-xs">
+          {/* Transparent Pricing Breakdown Inspired by Urban Company & Joboy */}
+          <div className="bg-stone-50 rounded-2xl p-3.5 border border-stone-200 space-y-2 text-xs">
+            <div className="flex items-center justify-between pb-1.5 border-b border-stone-200/80">
+              <span className="font-black text-black text-[11px] uppercase tracking-wider flex items-center gap-1">
+                <span>Transparent Price Breakdown</span>
+              </span>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                100% Direct Payout
+              </span>
+            </div>
+
             <div className="flex justify-between text-stone-600">
-              <span>Labor (₹{worker.hourlyRate} × {estimatedHours} hr)</span>
+              <span>Base Visit & Initial Diagnostic</span>
+              <span className="font-bold text-stone-900">₹99</span>
+            </div>
+
+            <div className="flex justify-between text-stone-600">
+              <span>Estimated Labour ({estimatedHours} hrs × ₹{worker.hourlyRate}/hr)</span>
               <span className="font-bold text-stone-900">₹{hourlyCharge}</span>
             </div>
+
             <div className="flex justify-between text-stone-600">
-              <span>Safety & Dispatch Assurance</span>
-              <span className="font-bold text-stone-900">₹{visitFee}</span>
+              <span>JOBit Safety & Damage Protection</span>
+              <span className="font-bold text-stone-900">₹29</span>
             </div>
+
+            <div className="flex justify-between text-stone-500">
+              <span>Platform Service / Convenience Fee</span>
+              <span className="font-bold text-emerald-700">₹0 (Zero Markup)</span>
+            </div>
+
             <div className="flex justify-between text-emerald-600 font-bold">
-              <span>JOBit Promo Discount</span>
-              <span>-₹{discount}</span>
+              <span>Safety Fee Promo Waiver</span>
+              <span>-₹29</span>
             </div>
-            <div className="border-t border-stone-200 pt-1.5 flex justify-between items-baseline font-black text-sm">
-              <span className="text-black">Total Payable</span>
-              <span className="text-red-600 text-base">₹{finalTotal}</span>
+
+            <div className="border-t border-stone-200 pt-2 flex justify-between items-baseline font-black">
+              <div>
+                <span className="text-black text-sm block">Total Estimated Amount</span>
+                <span className="text-[10px] text-stone-400 font-normal">Pay directly upon job completion</span>
+              </div>
+              <span className="text-red-600 text-lg font-black">₹{finalTotal}</span>
+            </div>
+
+            <div className="pt-1.5 border-t border-dashed border-stone-200 flex items-center gap-1.5 text-[10px] text-stone-500 font-medium">
+              <span className="text-emerald-600 font-bold">✓</span>
+              <span>No advance deposit needed. Free digital invoice generated upon completion.</span>
             </div>
           </div>
         </div>

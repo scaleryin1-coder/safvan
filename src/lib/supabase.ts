@@ -1,36 +1,60 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Booking, BookingStatus, NotificationItem, WorkerProfile } from '../types';
+import { Booking, BookingStatus, NotificationItem, UserAccount, UserRole, WorkerProfile } from '../types';
 import { INITIAL_BOOKINGS, INITIAL_NOTIFICATIONS, INITIAL_WORKERS } from '../data/mockData';
 
-// Storage keys
-const STORAGE_KEY_WORKERS = 'jobit_workers_v3';
-const STORAGE_KEY_BOOKINGS = 'jobit_bookings_v3';
-const STORAGE_KEY_NOTIFS = 'jobit_notifs_v3';
-const STORAGE_KEY_CONFIG = 'jobit_supabase_config_v3';
+// Storage keys (v4: Real database, no mock workers, one phone = one account)
+const STORAGE_KEY_WORKERS = 'jobit_workers_v4';
+const STORAGE_KEY_BOOKINGS = 'jobit_bookings_v4';
+const STORAGE_KEY_NOTIFS = 'jobit_notifs_v4';
+const STORAGE_KEY_ACCOUNTS = 'jobit_accounts_v4';
+const STORAGE_KEY_SESSION = 'jobit_session_v4';
+const STORAGE_KEY_CONFIG = 'jobit_supabase_config_v4';
+
+// Phone Normalization Helper: One Phone Number = One Account
+export function normalizePhone(raw: string): string {
+  if (!raw) return '';
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 10) {
+    return `+91${digits}`;
+  }
+  if (digits.length === 12 && digits.startsWith('91')) {
+    return `+${digits}`;
+  }
+  return `+${digits}`;
+}
+
+export function formatDisplayPhone(raw: string): string {
+  if (!raw) return '';
+  const digits = raw.replace(/\D/g, '');
+  const last10 = digits.slice(-10);
+  if (last10.length === 10) {
+    return `+91 ${last10.slice(0, 5)} ${last10.slice(5)}`;
+  }
+  return raw;
+}
 
 export function sanitizeWorker(w: any): WorkerProfile {
   return {
-    id: w?.id || `worker-${Math.random()}`,
+    id: w?.id || `worker-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     name: w?.name || 'Worker',
-    phone: w?.phone || '+91 98471 00000',
+    phone: formatDisplayPhone(w?.phone || '+91 98471 00000'),
     profession: w?.profession || 'Electrician',
-    skills: Array.isArray(w?.skills) && w.skills.length > 0
-      ? w.skills
-      : ['Inspection', 'General Repair', 'Maintenance'],
-    hourlyRate: typeof w?.hourlyRate === 'number' ? w.hourlyRate : 150,
-    dailyRate: typeof w?.dailyRate === 'number' ? w.dailyRate : 750,
-    experience: typeof w?.experience === 'number' ? w.experience : 5,
+    subCategory: w?.subCategory || undefined,
+    skills: Array.isArray(w?.skills) && w.skills.length > 0 ? w.skills : ['General Service'],
+    hourlyRate: typeof w?.hourlyRate === 'number' ? w.hourlyRate : 160,
+    dailyRate: typeof w?.dailyRate === 'number' ? w.dailyRate : 800,
+    experience: typeof w?.experience === 'number' ? w.experience : 3,
     isOnline: typeof w?.isOnline === 'boolean' ? w.isOnline : true,
-    rating: typeof w?.rating === 'number' ? w.rating : 4.8,
-    reviewCount: typeof w?.reviewCount === 'number' ? w.reviewCount : 50,
-    jobsCompleted: typeof w?.jobsCompleted === 'number' ? w.jobsCompleted : 100,
+    rating: typeof w?.rating === 'number' ? w.rating : 5.0,
+    reviewCount: typeof w?.reviewCount === 'number' ? w.reviewCount : 0,
+    jobsCompleted: typeof w?.jobsCompleted === 'number' ? w.jobsCompleted : 0,
     location: w?.location || {
       name: 'Perinthalmanna, Kerala',
       lat: 10.9760,
       lng: 76.2254,
-      address: 'Pattambi Road Junction, Perinthalmanna, Kerala'
+      address: 'Perinthalmanna, Malappuram, Kerala'
     },
-    distanceKm: typeof w?.distanceKm === 'number' ? w.distanceKm : 1.2,
+    distanceKm: typeof w?.distanceKm === 'number' ? w.distanceKm : 1.0,
     verified: typeof w?.verified === 'boolean' ? w.verified : true,
     availableSlots: Array.isArray(w?.availableSlots) && w.availableSlots.length > 0
       ? w.availableSlots
@@ -39,7 +63,7 @@ export function sanitizeWorker(w: any): WorkerProfile {
       ? w.availableDays
       : ['Today', 'Tomorrow'],
     bio: w?.bio || 'Verified professional on JOBit.',
-    joinedDate: w?.joinedDate || 'Jan 2023'
+    joinedDate: w?.joinedDate || 'Recently'
   };
 }
 
@@ -83,10 +107,12 @@ export function saveSupabaseConfig(url: string, anonKey: string): boolean {
   try {
     if (!url || !anonKey) {
       localStorage.removeItem(STORAGE_KEY_CONFIG);
+      supabaseInstance = null;
       notifySync();
       return true;
     }
     localStorage.setItem(STORAGE_KEY_CONFIG, JSON.stringify({ url, anonKey }));
+    supabaseInstance = createClient(url, anonKey);
     notifySync();
     return true;
   } catch (e) {
@@ -109,10 +135,10 @@ export function getSupabaseClient(): SupabaseClient | null {
   return null;
 }
 
-// Custom event to sync views across customer and worker tabs
-function notifySync() {
+// Custom event to sync views across customer, worker, and admin tabs
+function notifySync(detail?: Record<string, any>) {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('kaamkaro_data_sync'));
+    window.dispatchEvent(new CustomEvent('kaamkaro_data_sync', { detail }));
   }
 }
 
@@ -140,55 +166,162 @@ function setStored<T>(key: string, val: T): void {
 export function initLocalStore(): void {
   if (typeof window === 'undefined') return;
 
-  // Clean legacy keys from older version
+  // Clean legacy dummy data keys from older version
   try {
     localStorage.removeItem('kaamkaro_workers_v1');
     localStorage.removeItem('kaamkaro_bookings_v1');
     localStorage.removeItem('kaamkaro_notifs_v1');
+    localStorage.removeItem('jobit_workers_v3');
+    localStorage.removeItem('jobit_bookings_v3');
+    localStorage.removeItem('jobit_notifs_v3');
   } catch {}
 
+  // Initialize v4 keys if empty (strictly empty: no mock workers)
   if (!localStorage.getItem(STORAGE_KEY_WORKERS)) {
-    localStorage.setItem(STORAGE_KEY_WORKERS, JSON.stringify(INITIAL_WORKERS));
+    localStorage.setItem(STORAGE_KEY_WORKERS, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEY_BOOKINGS)) {
-    localStorage.setItem(STORAGE_KEY_BOOKINGS, JSON.stringify(INITIAL_BOOKINGS));
+    localStorage.setItem(STORAGE_KEY_BOOKINGS, JSON.stringify([]));
   }
   if (!localStorage.getItem(STORAGE_KEY_NOTIFS)) {
-    localStorage.setItem(STORAGE_KEY_NOTIFS, JSON.stringify(INITIAL_NOTIFICATIONS));
+    localStorage.setItem(STORAGE_KEY_NOTIFS, JSON.stringify([]));
+  }
+  if (!localStorage.getItem(STORAGE_KEY_ACCOUNTS)) {
+    localStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify([]));
   }
 }
 
-// Data API: Workers
+// -------------------------------------------------------------
+// USER ACCOUNTS API (Rule: "One Phone Number = One Account")
+// -------------------------------------------------------------
+
+export async function fetchAccounts(): Promise<UserAccount[]> {
+  const localAccounts = getStored<UserAccount[]>(STORAGE_KEY_ACCOUNTS, []) || [];
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { data, error } = await client.from('user_accounts').select('*');
+      if (!error && data && data.length > 0) {
+        const remoteAccounts = data as UserAccount[];
+        const map = new Map<string, UserAccount>();
+        localAccounts.forEach((a) => map.set(normalizePhone(a.phone), a));
+        remoteAccounts.forEach((a) => map.set(normalizePhone(a.phone), a));
+        const merged = Array.from(map.values());
+        setStored(STORAGE_KEY_ACCOUNTS, merged);
+        return merged;
+      }
+    } catch (e) {
+      console.warn('Supabase fetch accounts fallback to local', e);
+    }
+  }
+  return localAccounts;
+}
+
+export async function findAccountByPhone(phone: string): Promise<UserAccount | null> {
+  const norm = normalizePhone(phone);
+  const accounts = await fetchAccounts();
+  return accounts.find((a) => normalizePhone(a.phone) === norm) || null;
+}
+
+export async function saveAccount(account: UserAccount): Promise<UserAccount> {
+  const norm = normalizePhone(account.phone);
+  const current = getStored<UserAccount[]>(STORAGE_KEY_ACCOUNTS, []);
+  
+  const cleanAccount: UserAccount = {
+    ...account,
+    phone: norm,
+    displayPhone: formatDisplayPhone(account.phone),
+    lastLoginAt: new Date().toISOString()
+  };
+
+  // Enforce One Phone Number = One Account
+  const index = current.findIndex((a) => normalizePhone(a.phone) === norm);
+  let updated: UserAccount[];
+
+  if (index >= 0) {
+    updated = [...current];
+    updated[index] = { ...current[index], ...cleanAccount };
+  } else {
+    updated = [cleanAccount, ...current];
+  }
+
+  setStored(STORAGE_KEY_ACCOUNTS, updated);
+
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { error } = await client.from('user_accounts').upsert(cleanAccount);
+      if (error) {
+        console.warn('Supabase save account warning:', error.message);
+      }
+    } catch (e) {
+      console.warn('Supabase save account fallback', e);
+    }
+  }
+
+  notifySync({ type: 'account_saved', account: cleanAccount });
+  return cleanAccount;
+}
+
+export function getActiveSession(): UserAccount | null {
+  return getStored<UserAccount | null>(STORAGE_KEY_SESSION, null);
+}
+
+export function setActiveSession(account: UserAccount | null): void {
+  if (!account) {
+    localStorage.removeItem(STORAGE_KEY_SESSION);
+  } else {
+    localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(account));
+  }
+  notifySync({ type: 'session_change', account });
+}
+
+// -------------------------------------------------------------
+// WORKERS API (Rule: "One Phone Number = One Worker Registration")
+// -------------------------------------------------------------
+
 export async function fetchWorkers(): Promise<WorkerProfile[]> {
+  const localList = (getStored<WorkerProfile[]>(STORAGE_KEY_WORKERS, []) || []).map(sanitizeWorker);
   const client = getSupabaseClient();
   if (client) {
     try {
       const { data, error } = await client.from('workers').select('*');
       if (!error && data && data.length > 0) {
-        return (data as any[]).map(sanitizeWorker);
+        const remoteList = (data as any[]).map(sanitizeWorker);
+        const map = new Map<string, WorkerProfile>();
+        localList.forEach((w) => map.set(w.id, w));
+        remoteList.forEach((w) => map.set(w.id, w));
+        const merged = Array.from(map.values());
+        setStored(STORAGE_KEY_WORKERS, merged);
+        return merged;
       }
     } catch (e) {
-      console.warn('Supabase fetch workers failed, falling back to local store', e);
+      console.warn('Supabase fetch workers fallback to local', e);
     }
   }
-  const rawList = getStored<WorkerProfile[]>(STORAGE_KEY_WORKERS, INITIAL_WORKERS);
-  return (Array.isArray(rawList) ? rawList : INITIAL_WORKERS).map(sanitizeWorker);
+  return localList;
 }
 
-export async function upsertWorker(worker: WorkerProfile): Promise<WorkerProfile> {
+export async function upsertWorker(worker: WorkerProfile): Promise<{ success: boolean; worker?: WorkerProfile; error?: string }> {
   const cleanWorker = sanitizeWorker(worker);
-  const client = getSupabaseClient();
-  if (client) {
-    try {
-      await client.from('workers').upsert(cleanWorker);
-    } catch (e) {
-      console.warn('Supabase worker upsert fallback to local', e);
-    }
+  const normPhone = normalizePhone(cleanWorker.phone);
+
+  const current = getStored<WorkerProfile[]>(STORAGE_KEY_WORKERS, []);
+  const safeList = (Array.isArray(current) ? current : []).map(sanitizeWorker);
+
+  // STRICT RULE: One Phone Number = One Worker Registration
+  const existingWorker = safeList.find(
+    (w) => normalizePhone(w.phone) === normPhone && w.id !== cleanWorker.id
+  );
+
+  if (existingWorker) {
+    return {
+      success: false,
+      error: `Mobile number ${formatDisplayPhone(cleanWorker.phone)} is already registered to worker "${existingWorker.name}". Only one worker registration is permitted per phone number.`
+    };
   }
 
-  const current = getStored<WorkerProfile[]>(STORAGE_KEY_WORKERS, INITIAL_WORKERS);
-  const safeList = (Array.isArray(current) ? current : INITIAL_WORKERS).map(sanitizeWorker);
-  const index = safeList.findIndex((w) => w.id === cleanWorker.id);
+  const index = safeList.findIndex((w) => w.id === cleanWorker.id || normalizePhone(w.phone) === normPhone);
   let updated: WorkerProfile[];
   if (index >= 0) {
     updated = [...safeList];
@@ -196,11 +329,61 @@ export async function upsertWorker(worker: WorkerProfile): Promise<WorkerProfile
   } else {
     updated = [cleanWorker, ...safeList];
   }
+
+  // Instantly save to local reactive store
   setStored(STORAGE_KEY_WORKERS, updated);
-  return cleanWorker;
+
+  // Instantly persist to Supabase Database
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      // Strip client-only properties like distanceKm
+      const { distanceKm, ...dbWorker } = cleanWorker;
+      const { error } = await client.from('workers').upsert(dbWorker);
+      if (error) {
+        console.warn('Supabase worker upsert note:', error.message);
+      }
+    } catch (e) {
+      console.warn('Supabase worker upsert fallback to local', e);
+    }
+  }
+
+  // Also bind to user account if one exists
+  const userAcc = await findAccountByPhone(cleanWorker.phone);
+  if (userAcc) {
+    await saveAccount({
+      ...userAcc,
+      role: 'worker',
+      workerProfileId: cleanWorker.id
+    });
+  }
+
+  notifySync({ type: 'worker_registered', worker: cleanWorker });
+  return { success: true, worker: cleanWorker };
 }
 
-// Data API: Bookings
+export async function deleteWorker(workerId: string): Promise<boolean> {
+  const current = getStored<WorkerProfile[]>(STORAGE_KEY_WORKERS, []);
+  const updated = current.filter((w) => w.id !== workerId);
+  setStored(STORAGE_KEY_WORKERS, updated);
+
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      await client.from('workers').delete().eq('id', workerId);
+    } catch (e) {
+      console.warn('Supabase delete worker fallback', e);
+    }
+  }
+
+  notifySync({ type: 'worker_deleted', workerId });
+  return true;
+}
+
+// -------------------------------------------------------------
+// BOOKINGS API
+// -------------------------------------------------------------
+
 export async function fetchBookings(): Promise<Booking[]> {
   const client = getSupabaseClient();
   if (client) {
@@ -209,15 +392,15 @@ export async function fetchBookings(): Promise<Booking[]> {
         .from('bookings')
         .select('*')
         .order('createdAt', { ascending: false });
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return (data as any[]).map(sanitizeBooking);
       }
     } catch (e) {
       console.warn('Supabase fetch bookings fallback to local', e);
     }
   }
-  const rawList = getStored<Booking[]>(STORAGE_KEY_BOOKINGS, INITIAL_BOOKINGS);
-  return (Array.isArray(rawList) ? rawList : INITIAL_BOOKINGS).map(sanitizeBooking);
+  const rawList = getStored<Booking[]>(STORAGE_KEY_BOOKINGS, []);
+  return (Array.isArray(rawList) ? rawList : []).map(sanitizeBooking);
 }
 
 export async function createBooking(newBooking: Booking): Promise<Booking> {
@@ -230,7 +413,7 @@ export async function createBooking(newBooking: Booking): Promise<Booking> {
     }
   }
 
-  const current = getStored<Booking[]>(STORAGE_KEY_BOOKINGS, INITIAL_BOOKINGS);
+  const current = getStored<Booking[]>(STORAGE_KEY_BOOKINGS, []);
   const updated = [newBooking, ...current];
   setStored(STORAGE_KEY_BOOKINGS, updated);
 
@@ -238,13 +421,14 @@ export async function createBooking(newBooking: Booking): Promise<Booking> {
   await addNotification({
     id: `notif-${Date.now()}`,
     title: '📢 Booking Request Placed!',
-    message: `Your booking for ${newBooking.taskTitle} was sent to ${newBooking.workerName}.`,
+    message: `Your booking for ${newBooking.taskTitle} was sent to ${newBooking.workerName || 'the assigned worker'}.`,
     type: 'booking',
     timestamp: 'Just now',
     read: false,
     bookingId: newBooking.id
   });
 
+  notifySync({ type: 'booking_created', booking: newBooking });
   return newBooking;
 }
 
@@ -253,7 +437,7 @@ export async function updateBookingStatus(
   status: BookingStatus,
   extraUpdates?: Partial<Booking>
 ): Promise<Booking | null> {
-  const current = getStored<Booking[]>(STORAGE_KEY_BOOKINGS, INITIAL_BOOKINGS);
+  const current = getStored<Booking[]>(STORAGE_KEY_BOOKINGS, []);
   const index = current.findIndex((b) => b.id === bookingId);
   if (index === -1) return null;
 
@@ -303,8 +487,30 @@ export async function updateBookingStatus(
     ...target,
     ...extraUpdates,
     status,
+    completedAt: status === 'completed' ? (target.completedAt || new Date().toISOString()) : target.completedAt,
+    invoiceNumber: target.invoiceNumber || `INV-JOBIT-${target.id.replace(/\D/g, '').slice(0, 6) || '98231'}`,
     timeline: updatedTimeline
   };
+
+  // When customer submits a rating, dynamically update worker's rating & review count for top visibility
+  if (extraUpdates?.rating && target.workerId) {
+    const currentWorkers = getStored<WorkerProfile[]>(STORAGE_KEY_WORKERS, []);
+    const wIdx = currentWorkers.findIndex(w => w.id === target.workerId);
+    if (wIdx >= 0) {
+      const worker = currentWorkers[wIdx];
+      const prevCount = worker.reviewCount || 1;
+      const prevRating = worker.rating || 4.8;
+      const newCount = prevCount + 1;
+      const newRating = Number(((prevRating * prevCount + extraUpdates.rating) / newCount).toFixed(1));
+      currentWorkers[wIdx] = {
+        ...worker,
+        rating: Math.min(5.0, Math.max(1.0, newRating)),
+        reviewCount: newCount,
+        jobsCompleted: Math.max(worker.jobsCompleted || 0, (worker.jobsCompleted || 0) + 1)
+      };
+      setStored(STORAGE_KEY_WORKERS, currentWorkers);
+    }
+  }
 
   current[index] = updatedBooking;
   setStored(STORAGE_KEY_BOOKINGS, current);
@@ -330,10 +536,28 @@ export async function updateBookingStatus(
     bookingId
   });
 
+  notifySync({ type: 'booking_updated', booking: updatedBooking, status });
   return updatedBooking;
 }
 
-// Data API: Notifications
+// Admin helper: Reassign a booking to another worker
+export async function reassignBookingWorker(
+  bookingId: string,
+  worker: WorkerProfile
+): Promise<Booking | null> {
+  return updateBookingStatus(bookingId, 'accepted', {
+    workerId: worker.id,
+    workerName: worker.name,
+    workerPhone: worker.phone,
+    workerProfession: worker.profession,
+    hourlyRate: worker.hourlyRate
+  });
+}
+
+// -------------------------------------------------------------
+// NOTIFICATIONS API
+// -------------------------------------------------------------
+
 export async function fetchNotifications(): Promise<NotificationItem[]> {
   const client = getSupabaseClient();
   if (client) {
@@ -346,11 +570,11 @@ export async function fetchNotifications(): Promise<NotificationItem[]> {
       console.warn('Supabase fetch notifs fallback', e);
     }
   }
-  return getStored<NotificationItem[]>(STORAGE_KEY_NOTIFS, INITIAL_NOTIFICATIONS);
+  return getStored<NotificationItem[]>(STORAGE_KEY_NOTIFS, []);
 }
 
 export async function addNotification(item: NotificationItem): Promise<void> {
-  const current = getStored<NotificationItem[]>(STORAGE_KEY_NOTIFS, INITIAL_NOTIFICATIONS);
+  const current = getStored<NotificationItem[]>(STORAGE_KEY_NOTIFS, []);
   const updated = [item, ...current];
   setStored(STORAGE_KEY_NOTIFS, updated);
 
@@ -365,31 +589,80 @@ export async function addNotification(item: NotificationItem): Promise<void> {
 }
 
 export async function markAllNotificationsRead(): Promise<void> {
-  const current = getStored<NotificationItem[]>(STORAGE_KEY_NOTIFS, INITIAL_NOTIFICATIONS);
+  const current = getStored<NotificationItem[]>(STORAGE_KEY_NOTIFS, []);
   const updated = current.map((n) => ({ ...n, read: true }));
   setStored(STORAGE_KEY_NOTIFS, updated);
 }
 
+// Supabase Real-time Subscription Helper
+let realtimeChannel: any = null;
+
+export function setupSupabaseRealtime(onSync: () => void): () => void {
+  const client = getSupabaseClient();
+  if (!client) return () => {};
+
+  try {
+    if (realtimeChannel) {
+      client.removeChannel(realtimeChannel);
+      realtimeChannel = null;
+    }
+
+    realtimeChannel = client
+      .channel('jobit_realtime_stream')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workers' }, () => {
+        onSync();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_accounts' }, () => {
+        onSync();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => {
+        onSync();
+      })
+      .subscribe();
+
+    return () => {
+      if (realtimeChannel && client) {
+        client.removeChannel(realtimeChannel);
+        realtimeChannel = null;
+      }
+    };
+  } catch (e) {
+    console.warn('Supabase Realtime not enabled', e);
+    return () => {};
+  }
+}
+
 export const SUPABASE_SQL_SCHEMA = `-- JOBit Hyperlocal Schema for Supabase
+CREATE TABLE IF NOT EXISTS user_accounts (
+  id TEXT PRIMARY KEY,
+  phone TEXT UNIQUE NOT NULL,
+  "displayPhone" TEXT,
+  name TEXT NOT NULL,
+  role TEXT DEFAULT 'customer',
+  "workerProfileId" TEXT,
+  "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  "lastLoginAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS workers (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  phone TEXT NOT NULL,
-  avatar TEXT,
+  phone TEXT UNIQUE NOT NULL,
   profession TEXT NOT NULL,
+  "subCategory" TEXT,
   skills JSONB DEFAULT '[]'::jsonb,
   "dailyRate" NUMERIC DEFAULT 800,
-  "hourlyRate" NUMERIC DEFAULT 150,
-  experience NUMERIC DEFAULT 5,
+  "hourlyRate" NUMERIC DEFAULT 160,
+  experience NUMERIC DEFAULT 3,
   "isOnline" BOOLEAN DEFAULT true,
-  rating NUMERIC DEFAULT 4.8,
-  "reviewCount" NUMERIC DEFAULT 10,
-  "jobsCompleted" NUMERIC DEFAULT 50,
+  rating NUMERIC DEFAULT 5.0,
+  "reviewCount" NUMERIC DEFAULT 0,
+  "jobsCompleted" NUMERIC DEFAULT 0,
   location JSONB,
   verified BOOLEAN DEFAULT true,
-  badge TEXT,
   bio TEXT,
-  equipment JSONB DEFAULT '[]'::jsonb,
+  "availableSlots" JSONB DEFAULT '[]'::jsonb,
+  "availableDays" JSONB DEFAULT '[]'::jsonb,
   "joinedDate" TEXT
 );
 
@@ -403,16 +676,17 @@ CREATE TABLE IF NOT EXISTS bookings (
   "workerId" TEXT,
   "workerName" TEXT,
   "workerPhone" TEXT,
-  "workerAvatar" TEXT,
   "workerProfession" TEXT,
+  "subCategory" TEXT,
   "taskTitle" TEXT,
   "taskDescription" TEXT,
-  "scheduledType" TEXT,
-  "scheduledTimeText" TEXT,
+  "selectedDate" TEXT,
+  "selectedSlot" TEXT,
+  "selectedSlotLabel" TEXT,
   status TEXT,
   "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   "acceptedAt" TIMESTAMP WITH TIME ZONE,
-  "etaMinutes" NUMERIC,
+  "completedAt" TIMESTAMP WITH TIME ZONE,
   otp TEXT,
   "hourlyRate" NUMERIC,
   "estimatedHours" NUMERIC,
@@ -422,6 +696,11 @@ CREATE TABLE IF NOT EXISTS bookings (
   "paymentStatus" TEXT,
   rating NUMERIC,
   review TEXT,
+  compliments JSONB DEFAULT '[]'::jsonb,
+  "invoiceNumber" TEXT,
+  "baseCharge" NUMERIC DEFAULT 99,
+  "safetyFee" NUMERIC DEFAULT 29,
+  "serviceFee" NUMERIC DEFAULT 0,
   timeline JSONB DEFAULT '[]'::jsonb
 );
 
@@ -434,4 +713,10 @@ CREATE TABLE IF NOT EXISTS notifications (
   read BOOLEAN DEFAULT false,
   "bookingId" TEXT
 );
+
+-- Permissive public policies for fast development
+ALTER TABLE user_accounts DISABLE ROW LEVEL SECURITY;
+ALTER TABLE workers DISABLE ROW LEVEL SECURITY;
+ALTER TABLE bookings DISABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
 `;

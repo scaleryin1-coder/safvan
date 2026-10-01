@@ -7,7 +7,9 @@ import {
   Clock, 
   Calendar,
   CheckCircle2,
-  Zap
+  Zap,
+  Receipt,
+  Navigation
 } from 'lucide-react';
 import { Booking } from '../types';
 import { JobitAvatar } from './JobitAvatar';
@@ -98,13 +100,12 @@ export const BookingsListView: React.FC<BookingsListViewProps> = ({
 
               {/* Status footer button */}
               <div className="mt-3 pt-2.5 border-t border-stone-100 flex items-center justify-between text-xs">
-                <span className="text-stone-500 font-medium">
-                  {b.status === 'scheduled_confirmed'
-                    ? '📅 Time slot confirmed by worker'
-                    : '⚡ Assignment active'}
+                <span className="text-stone-500 font-medium flex items-center gap-1">
+                  <Navigation className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>{b.status === 'on_the_way' ? 'Live Map: En Route 🛵' : 'Live Tracking Map Active'}</span>
                 </span>
                 <span className="font-black text-red-600 flex items-center gap-0.5">
-                  <span>Track Status</span>
+                  <span>Track Live</span>
                   <ChevronRight className="w-4 h-4" />
                 </span>
               </div>
@@ -172,15 +173,23 @@ export const BookingsListView: React.FC<BookingsListViewProps> = ({
                 </div>
               </div>
 
-              {b.review && (
-                <div className="mt-2 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-600">
-                  <span className="italic truncate max-w-[200px]">"{b.review}"</span>
-                  <div className="flex items-center gap-0.5 text-amber-500 font-bold shrink-0">
-                    <Star className="w-3 h-3 fill-amber-400" />
-                    <span>{b.rating ?? 5}.0 ★</span>
-                  </div>
+              <div className="mt-2.5 pt-2 border-t border-stone-100 flex items-center justify-between text-[11px]">
+                <div className="flex items-center gap-1 text-stone-600 font-bold">
+                  <Receipt className="w-3.5 h-3.5 text-stone-500" />
+                  <span>Invoice: {b.invoiceNumber || `INV-${b.id}`}</span>
                 </div>
-              )}
+                
+                {b.rating ? (
+                  <div className="flex items-center gap-0.5 text-amber-500 font-bold">
+                    <Star className="w-3 h-3 fill-amber-400" />
+                    <span>{b.rating}.0 ★</span>
+                  </div>
+                ) : (
+                  <span className="text-red-600 font-black flex items-center gap-0.5 hover:underline">
+                    <span>⭐ Rate Pro</span>
+                  </span>
+                )}
+              </div>
             </div>
           ))
         )}
